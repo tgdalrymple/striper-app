@@ -83,6 +83,23 @@
                   <p class="rationale">{{ r.rationale }}</p>
                   <p class="components">Score breakdown — light {{ r.components.light }}, tide {{ r.components.tide }}, wind {{ r.components.wind }}, cloud {{ r.components.cloud }}, moon {{ r.components.moon }}, structure {{ r.components.structure }}</p>
                 </details>
+
+                {% if r.spot.obstructions %}
+                <details class="obstructions-details">
+                  <summary>⚠️ Nearby obstructions ({{ r.spot.obstructions|length }} within 1 nm)</summary>
+                  <ul class="obstructions-list">
+                    {% for o in r.spot.obstructions %}
+                    <li>
+                      <span class="obs-type obs-{{ o.type }}">{{ o.type|title }}</span>{% if o.category %} <em>({{ o.category }})</em>{% endif %}
+                      — <strong>{{ o.distance_yd }} yd {{ o.compass }}</strong>
+                      {% if o.depth_ft is not none %}· {{ o.depth_ft }} ft{% else %}· depth unknown{% endif %}
+                      {% if o.info %}<br><span class="obs-info">{{ o.info }}</span>{% endif %}
+                    </li>
+                    {% endfor %}
+                  </ul>
+                  <p class="obs-footnote">Source: NOAA Electronic Navigational Charts (≤15 ft / unknown depth). Always verify on chart before navigating.</p>
+                </details>
+                {% endif %}
               </div>
             </article>
           {% endfor %}

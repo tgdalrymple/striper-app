@@ -159,3 +159,28 @@ footer {
 footer a { color: var(--accent); }
 
 .empty { color: var(--muted); font-style: italic; }
+
+.obstructions-details summary { color: var(--warn); }
+.obstructions-list {
+  margin: .5rem 0 .5rem 0;
+  padding-left: 1rem;
+  font-size: .85rem;
+  color: var(--text);
+}
+.obstructions-list li { margin: .35rem 0; }
+.obs-type {
+  display: inline-block;
+  padding: .05rem .4rem;
+  border-radius: 4px;
+  font-size: .7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: var(--panel-light);
+  margin-right: .3rem;
+}
+.obs-obstruction { background: #5a3c1f; color: #ffd591; }
+.obs-wreck { background: #5a1f1f; color: #ffb1b1; }
+.obs-rock { background: #3a3a3a; color: #d0d0d0; }
+.obs-daymark { background: #1f3c5a; color: #91c8ff; }
+.obs-info { color: var(--muted); font-size: .8rem; }
+.obs-footnote { color: var(--muted); font-size: .75rem; margin: .5rem 0 0; }

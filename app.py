@@ -26,7 +26,7 @@ from pathlib import Path
 
 from flask import Flask, render_template
 
-from services import tides, weather, moon, sun, scorer, dnr_report
+from services import tides, weather, moon, sun, scorer, dnr_report, obstructions
 
 app = Flask(__name__)
 
@@ -43,7 +43,13 @@ _cache = {"data": None, "expires_at": 0.0}
 
 def load_spots() -> list[dict]:
     with open(SPOTS_PATH) as f:
-        return json.load(f)["spots"]
+        spots = json.load(f)["spots"]
+    # Pre-compute the obstruction list for each spot once at load time —
+    # the geometry never changes, only conditions do.
+    obs = obstructions.load_all()
+    for s in spots:
+        s["obstructions"] = obstructions.nearby(s, obs, radius_nm=1.0, limit=8)
+    return spots
 
 
 def build_forecast() -> dict:

@@ -4,12 +4,12 @@ Scoring engine — turns raw conditions into a 0-100 score for each
 
 Weights are tunable. The defaults reflect topwater-striper conventional wisdom:
 
-  Light (40%)      — dawn/dusk dominate; mid-day only with heavy clouds.
-  Tide (25%)       — moving water 1-2 hrs from a change; slack tide is dead.
-  Wind / chop (15%) — 5-15 mph ideal; calm hurts, 20+ kills topwater.
+  Light (20%)      — dawn/dusk dominate; mid-day only with heavy clouds.
+  Tide (35%)       — moving water 1-2 hrs from a change; slack tide is dead.
+  Wind / chop (5%) — 5-15 mph ideal; calm hurts, 20+ kills topwater.
   Cloud cover (10%) — extends bite window, especially mid-day.
-  Moon (5%)        — spring tides (new/full ±3d) intensify current.
-  Structure (5%)   — drop-offs and points get a small bonus.
+  Moon (15%)        — spring tides (new/full ±3d) intensify current.
+  Structure (15%)   — drop-offs and points get a small bonus.
 
 You can adjust these in `WEIGHTS` to match what you observe on the water.
 """
@@ -18,12 +18,12 @@ from datetime import datetime, timedelta
 from . import tides, weather, moon, sun, lure
 
 WEIGHTS = {
-    "light": 0.40,
-    "tide": 0.25,
-    "wind": 0.15,
+    "light": 0.20,
+    "tide": 0.35,
+    "wind": 0.05,
     "cloud": 0.10,
-    "moon": 0.05,
-    "structure": 0.05,
+    "moon": 0.15,
+    "structure": 0.15,
 }
 
 
