@@ -38,12 +38,12 @@ sub-scores are combined as a weighted average:
 
 | Weight | Criterion | What earns a high score |
 |---|---|---|
-| **40%** | **Light level** | Within 30 min of sunrise/sunset = 100. Drops sharply with distance from dawn/dusk windows. |
-| **25%** | **Tide phase** | 1–2 hours from a tide change (moving water) = 100. Slack tide (±30 min of high/low) = 15. |
-| **15%** | **Wind / surface chop** | 5–15 mph = 100 (ideal ripple). Slick calm <3 mph = 50. 21–25 mph = 30. >25 mph = 10. |
+| **35%** | **Tide phase** | 1–2 hours from a tide change (moving water) = 100. Slack tide (±30 min of high/low) = 15. |
+| **20%** | **Light level** | Within 30 min of sunrise/sunset = 100. Drops sharply with distance from dawn/dusk windows. |
+| **15%** | **Moon phase** | Spring tides (within 3 days of new or full moon) = 90. Otherwise 60. |
+| **15%** | **Structure** | Spots with a defined drop-off = 80. Open-water spots = 60. |
 | **10%** | **Cloud cover** | Especially valuable mid-day — overcast extends the low-light bite window. |
-| **5%** | **Moon phase** | Spring tides (within 3 days of new or full moon) = 90. Otherwise 60. |
-| **5%** | **Structure** | Spots with a defined drop-off = 80. Open-water spots = 60. |
+| **5%** | **Wind / surface chop** | 5–15 mph = 100 (ideal ripple). Slick calm <3 mph = 50. 21–25 mph = 30. >25 mph = 10. |
 
 Weights are tunable in `services/scorer.py` (the `WEIGHTS` dictionary) to reflect
 what you observe on the water.
