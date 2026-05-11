@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Striper Topwater Forecast — Choptank &amp; Mid-Bay</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+  <header class="page-header">
+    <h1>Striper Topwater Forecast</h1>
+    <p class="sub">Choptank River · Little Choptank · Bay (Poplar Is. → Little Choptank)</p>
+    <p class="meta">
+      Generated {{ f.generated_at.strftime('%A, %b %-d %Y · %-I:%M %p') }} ·
+      Next {{ f.days|length }} days
+    </p>
+  </header>
+
+  {% if f.dnr %}
+  <section class="dnr">
+    <h2>Latest MD DNR Fishing Report</h2>
+    <p class="dnr-title">
+      <a href="{{ f.dnr.url }}" target="_blank" rel="noopener">{{ f.dnr.title }}</a>
+      {% if f.dnr.date %}<span class="dnr-date">— {{ f.dnr.date }}</span>{% endif %}
+    </p>
+    {% if f.dnr.excerpt %}<p class="dnr-excerpt">{{ f.dnr.excerpt }}…</p>{% endif %}
+  </section>
+  {% endif %}
+
+  {% for day in f.days %}
+    <section class="day">
+      <header class="day-header">
+        <div>
+          <h2>{{ day.weekday }} · {{ day.pretty }}</h2>
+          <p class="day-meta">
+            Sunrise {{ day.sunrise }} · Sunset {{ day.sunset }} ·
+            {{ day.moon.phase_name }} ({{ day.moon.illumination_pct }}%)
+            {% if day.moon.is_spring_tide %}<span class="spring">⚡ Spring tide</span>{% endif %}
+          </p>
+        </div>
+      </header>
+
+      {% set picks = f.results_by_day[day.date_key] %}
+      {% if not picks %}
+        <p class="empty">No data available for this day.</p>
+      {% else %}
+        <div class="cards">
+          {% for r in picks %}
+            <article class="card score-{{ ((r.score // 10) | int) * 10 }}">
+              <div class="rank">#{{ loop.index }}</div>
+              <div class="card-main">
+                <h3>{{ r.spot.name }}</h3>
+                <p class="region">{{ r.spot.region }} · Chart {{ r.spot.chart }}</p>
+                <p class="time-big">
+                  🕒 {{ r.time.strftime('%-I:%M %p') }}
+                  <span class="score-pill">{{ r.score }}</span>
+                </p>
+
+                <div class="lure">
+                  <p class="lure-label"><span class="badge badge-primary">{{ r.lure.primary.type }}</span> <strong>🎣 Primary pick</strong></p>
+                  <p><strong>Lure:</strong> {{ r.lure.primary.lure }}</p>
+                  <p><strong>🎨 Color:</strong> {{ r.lure.primary.color }}</p>
+                  <p class="lure-why"><em>{{ r.lure.primary.why }}</em></p>
+                </div>
+
+                <div class="lure lure-alt">
+                  <p class="lure-label"><span class="badge badge-alt">{{ r.lure.alternative.type }}</span> <strong>🔄 If primary isn’t producing</strong></p>
+                  <p><strong>Lure:</strong> {{ r.lure.alternative.lure }}</p>
+                  <p><strong>🎨 Color:</strong> {{ r.lure.alternative.color }}</p>
+                  <p class="lure-why"><em>{{ r.lure.alternative.why }}</em></p>
+                </div>
+
+                <details>
+                  <summary>Conditions &amp; rationale</summary>
+                  <ul class="conditions">
+                    <li>Tide: {{ r.conditions.tide_phase }} — {{ r.conditions.minutes_from_tide_change }} min from change</li>
+                    <li>Wind: {{ r.conditions.wind_mph }} mph</li>
+                    <li>Sky: {{ r.conditions.sky_cover_pct }}% covered</li>
+                    <li>Air temp: {{ r.conditions.temp_f }}°F</li>
+                    <li>Moon: {{ r.conditions.moon_phase }} ({{ r.conditions.moon_illum_pct }}%){% if r.conditions.is_spring_tide %} · spring tide{% endif %}</li>
+                    <li>Structure: {{ r.spot.structure }}</li>
+                  </ul>
+                  <p class="rationale">{{ r.rationale }}</p>
+                  <p class="components">Score breakdown — light {{ r.components.light }}, tide {{ r.components.tide }}, wind {{ r.components.wind }}, cloud {{ r.components.cloud }}, moon {{ r.components.moon }}, structure {{ r.components.structure }}</p>
+                </details>
+              </div>
+            </article>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </section>
+  {% endfor %}
+
+  <footer>
+    <p>
+      Tide data: NOAA Tides &amp; Currents · Weather: NOAA NWS ·
+      Report excerpts: <a href="https://news.maryland.gov/dnr/category/fishing-report/" target="_blank">MD DNR</a>.
+      Charts: NOAA 12266 (Choptank), 12270 (Eastern Bay/Poplar). Verify coordinates before navigating.
+    </p>
+  </footer>
+</body>
+</html>
