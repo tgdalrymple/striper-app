@@ -62,73 +62,90 @@
         </div>
       </header>
 
-      {% set picks = f.results_by_day[day.date_key] %}
-      {% if not picks %}
-        <p class="empty">No data available for this day.</p>
-      {% else %}
-        <div class="cards">
-          {% for r in picks %}
-            <article class="card score-{{ ((r.score // 10) | int) * 10 }}">
-              <div class="rank">#{{ loop.index }}</div>
-              <div class="card-main">
-                <h3>{{ r.spot.name }}</h3>
-                <p class="region">{{ r.spot.region }} · Chart {{ r.spot.chart }}</p>
-                <p class="time-big">
-                  🕒 {{ r.time.strftime('%-I:%M %p') }}
-                  <span class="score-pill">{{ r.score }}</span>
-                </p>
-
-                <div class="lure">
-                  <p class="lure-label"><span class="badge badge-primary">{{ r.lure.primary.type }}</span> <strong>🎣 Primary pick</strong></p>
-                  <p><strong>Lure:</strong> {{ r.lure.primary.lure }}</p>
-                  <p><strong>🎨 Color:</strong> {{ r.lure.primary.color }}</p>
-                  <p class="lure-why"><em>{{ r.lure.primary.why }}</em></p>
-                </div>
-
-                <div class="lure lure-alt">
-                  <p class="lure-label"><span class="badge badge-alt">{{ r.lure.alternative.type }}</span> <strong>🔄 If primary isn’t producing</strong></p>
-                  <p><strong>Lure:</strong> {{ r.lure.alternative.lure }}</p>
-                  <p><strong>🎨 Color:</strong> {{ r.lure.alternative.color }}</p>
-                  <p class="lure-why"><em>{{ r.lure.alternative.why }}</em></p>
-                </div>
-
-                <details>
-                  <summary>Conditions &amp; rationale</summary>
-                  <ul class="conditions">
-                    <li>Tide: {{ r.conditions.tide_phase }} — {{ r.conditions.minutes_from_tide_change }} min from change</li>
-                    <li>Current: {{ r.conditions.current_label }} ({{ r.conditions.current_score }}/100) — {{ r.conditions.tidal_range_ft }} ft cycle range</li>
-                    {% if r.conditions.water_temp_f %}<li>Water temp: {{ r.conditions.water_temp_f }}°F ({{ r.conditions.water_temp_trend }})</li>{% endif %}
-                    {% if r.conditions.pressure_mb %}<li>Barometer: {{ r.conditions.pressure_mb }} mb ({{ r.conditions.pressure_trend }})</li>{% endif %}
-                    <li>Wind: {{ r.conditions.wind_mph }} mph</li>
-                    <li>Sky: {{ r.conditions.sky_cover_pct }}% covered</li>
-                    <li>Air temp: {{ r.conditions.temp_f }}°F</li>
-                    <li>Moon: {{ r.conditions.moon_phase }} ({{ r.conditions.moon_illum_pct }}%){% if r.conditions.is_spring_tide %} · spring tide{% endif %}</li>
-                    <li>Structure: {{ r.spot.structure }}</li>
-                  </ul>
-                  <p class="rationale">{{ r.rationale }}</p>
-                  <p class="components">Score breakdown — tide {{ r.components.tide }}, current {{ r.components.current }}, water_temp {{ r.components.water_temp }}, pressure {{ r.components.pressure }}, cloud {{ r.components.cloud }}, moon {{ r.components.moon }}, structure {{ r.components.structure }}, wind {{ r.components.wind }}</p>
-                </details>
-
-                {% if r.spot.obstructions %}
-                <details class="obstructions-details">
-                  <summary>⚠️ Nearby obstructions ({{ r.spot.obstructions|length }} within 1 nm)</summary>
-                  <ul class="obstructions-list">
-                    {% for o in r.spot.obstructions %}
-                    <li>
-                      <span class="obs-type obs-{{ o.type }}">{{ o.type|title }}</span>{% if o.category %} <em>({{ o.category }})</em>{% endif %}
-                      — <strong>{{ o.distance_yd }} yd {{ o.compass }}</strong>
-                      {% if o.depth_ft is not none %}· {{ o.depth_ft }} ft{% else %}· depth unknown{% endif %}
-                      {% if o.info %}<br><span class="obs-info">{{ o.info }}</span>{% endif %}
-                    </li>
-                    {% endfor %}
-                  </ul>
-                  <p class="obs-footnote">Source: NOAA Electronic Navigational Charts (≤15 ft / unknown depth). Always verify on chart before navigating.</p>
-                </details>
-                {% endif %}
-              </div>
-            </article>
-          {% endfor %}
+      {% if day.rainy %}
+        <div class="rain-banner">
+          🌧️ <strong>Rainy day forecast</strong> — {{ day.rain_hours_pct }}% of daylight hours are forecast rainy. Likely poor fishing conditions; consider another day.
         </div>
+      {% endif %}
+
+      {% set day_buckets = f.results_by_day_window[day.date_key] %}
+      {% set has_any = day_buckets.values()|map('length')|sum > 0 %}
+      {% if not has_any %}
+        <p class="empty">No future windows remaining today.</p>
+      {% else %}
+        {% for window_key, window_label in f.windows_ordered %}
+          {% set picks = day_buckets[window_key] %}
+          <div class="window-section">
+            <h3 class="window-header">{{ window_label }}</h3>
+            {% if not picks %}
+              <p class="empty">No picks for this window (already passed today).</p>
+            {% else %}
+              <div class="cards">
+                {% for r in picks %}
+                  <article class="card score-{{ ((r.score // 10) | int) * 10 }}">
+                    <div class="rank">#{{ loop.index }}</div>
+                    <div class="card-main">
+                      <h4>{{ r.spot.name }}</h4>
+                      <p class="region">{{ r.spot.region }} · Chart {{ r.spot.chart }}</p>
+                      <p class="time-big">
+                        🕒 {{ r.time.strftime('%-I:%M %p') }}
+                        <span class="score-pill">{{ r.score }}</span>
+                      </p>
+
+                      <div class="lure">
+                        <p class="lure-label"><span class="badge badge-primary">{{ r.lure.primary.type }}</span> <strong>🎣 Primary pick</strong></p>
+                        <p><strong>Lure:</strong> {{ r.lure.primary.lure }}</p>
+                        <p><strong>🎨 Color:</strong> {{ r.lure.primary.color }}</p>
+                        <p class="lure-why"><em>{{ r.lure.primary.why }}</em></p>
+                      </div>
+
+                      <div class="lure lure-alt">
+                        <p class="lure-label"><span class="badge badge-alt">{{ r.lure.alternative.type }}</span> <strong>🔄 If primary isn’t producing</strong></p>
+                        <p><strong>Lure:</strong> {{ r.lure.alternative.lure }}</p>
+                        <p><strong>🎨 Color:</strong> {{ r.lure.alternative.color }}</p>
+                        <p class="lure-why"><em>{{ r.lure.alternative.why }}</em></p>
+                      </div>
+
+                      <details>
+                        <summary>Conditions &amp; rationale</summary>
+                        <ul class="conditions">
+                          <li>Tide: {{ r.conditions.tide_phase }} — {{ r.conditions.minutes_from_tide_change }} min from change</li>
+                          <li>Current: {{ r.conditions.current_label }} ({{ r.conditions.current_score }}/100) — {{ r.conditions.tidal_range_ft }} ft cycle range</li>
+                          {% if r.conditions.water_temp_f %}<li>Water temp: {{ r.conditions.water_temp_f }}°F ({{ r.conditions.water_temp_trend }})</li>{% endif %}
+                          {% if r.conditions.pressure_mb %}<li>Barometer: {{ r.conditions.pressure_mb }} mb ({{ r.conditions.pressure_trend }})</li>{% endif %}
+                          <li>Wind: {{ r.conditions.wind_mph }} mph</li>
+                          <li>Sky: {{ r.conditions.sky_cover_pct }}% covered</li>
+                          <li>Air temp: {{ r.conditions.temp_f }}°F</li>
+                          <li>Moon: {{ r.conditions.moon_phase }} ({{ r.conditions.moon_illum_pct }}%){% if r.conditions.is_spring_tide %} · spring tide{% endif %}</li>
+                          <li>Structure: {{ r.spot.structure }}</li>
+                        </ul>
+                        <p class="rationale">{{ r.rationale }}</p>
+                        <p class="components">Score breakdown — tide {{ r.components.tide }}, current {{ r.components.current }}, water_temp {{ r.components.water_temp }}, pressure {{ r.components.pressure }}, cloud {{ r.components.cloud }}, moon {{ r.components.moon }}, structure {{ r.components.structure }}, wind {{ r.components.wind }}</p>
+                      </details>
+
+                      {% if r.spot.obstructions %}
+                      <details class="obstructions-details">
+                        <summary>⚠️ Nearby obstructions ({{ r.spot.obstructions|length }} within 1 nm)</summary>
+                        <ul class="obstructions-list">
+                          {% for o in r.spot.obstructions %}
+                          <li>
+                            <span class="obs-type obs-{{ o.type }}">{{ o.type|title }}</span>{% if o.category %} <em>({{ o.category }})</em>{% endif %}
+                            — <strong>{{ o.distance_yd }} yd {{ o.compass }}</strong>
+                            {% if o.depth_ft is not none %}· {{ o.depth_ft }} ft{% else %}· depth unknown{% endif %}
+                            {% if o.info %}<br><span class="obs-info">{{ o.info }}</span>{% endif %}
+                          </li>
+                          {% endfor %}
+                        </ul>
+                        <p class="obs-footnote">Source: NOAA Electronic Navigational Charts (≤15 ft / unknown depth). Always verify on chart before navigating.</p>
+                      </details>
+                      {% endif %}
+                    </div>
+                  </article>
+                {% endfor %}
+              </div>
+            {% endif %}
+          </div>
+        {% endfor %}
       {% endif %}
     </section>
   {% endfor %}

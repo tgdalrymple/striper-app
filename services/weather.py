@@ -79,6 +79,8 @@ def fetch_hourly_forecast(lat: float, lon: float) -> list[dict]:
     for p in periods:
         # wind speed comes as a string like "5 to 10 mph" or "10 mph"
         wind_mph = _parse_wind(p.get("windSpeed", "0 mph"))
+        # probabilityOfPrecipitation is a nested object with a numeric value
+        pop = p.get("probabilityOfPrecipitation") or {}
         result.append({
             "time": datetime.fromisoformat(p["startTime"]).replace(tzinfo=None),
             "temp_f": p.get("temperature"),
@@ -86,8 +88,38 @@ def fetch_hourly_forecast(lat: float, lon: float) -> list[dict]:
             "wind_dir": p.get("windDirection", ""),
             "sky_cover_pct": _sky_cover_from_forecast(p.get("shortForecast", "")),
             "short_forecast": p.get("shortForecast", ""),
+            "precip_pct": pop.get("value") or 0,
         })
     return result
+
+
+def is_rainy_day(hourly: list[dict], sunrise: datetime, sunset: datetime) -> tuple[bool, int]:
+    """
+    Decide whether more than half of a day's daylight hours are forecast rainy.
+
+    Returns (is_rainy_day, percent_of_daylight_hours_rainy).
+
+    "Rainy hour" definition: probability of precipitation ≥ 50% OR the short
+    forecast explicitly says "rain" / "shower" / "thunder" without the
+    "slight chance" qualifier. That excludes "Slight Chance Rain Showers"
+    (20-30% likely — not a write-off) but catches "Rain Showers Likely"
+    (60-70%) and unqualified "Rain".
+    """
+    if not hourly:
+        return False, 0
+    daylight = [h for h in hourly if sunrise <= h["time"] <= sunset]
+    if not daylight:
+        return False, 0
+    rainy = 0
+    for h in daylight:
+        prec = h.get("precip_pct") or 0
+        sf = (h.get("short_forecast") or "").lower()
+        has_rain_word = any(w in sf for w in ("rain", "shower", "thunder"))
+        is_slight = "slight chance" in sf
+        if prec >= 50 or (has_rain_word and not is_slight):
+            rainy += 1
+    pct = round(100 * rainy / len(daylight))
+    return pct > 50, pct
 
 
 def _parse_wind(s: str) -> int:

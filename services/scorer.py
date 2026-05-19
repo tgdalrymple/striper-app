@@ -261,17 +261,33 @@ def _rationale(spot, when, tide_state, current, mp, wind, sky, temp,
     return " ".join(parts)
 
 
-def candidate_windows(date_obj: datetime, lat: float, lon: float) -> list[datetime]:
+WINDOW_DAWN = "dawn"
+WINDOW_MID_MORNING = "mid_morning"
+WINDOW_MID_AFTERNOON = "mid_afternoon"
+WINDOW_DUSK = "dusk"
+
+# Ordered list for the template; (key, pretty label) pairs.
+WINDOWS_ORDERED = [
+    (WINDOW_DAWN,           "Dawn"),
+    (WINDOW_MID_MORNING,    "Mid-morning"),
+    (WINDOW_MID_AFTERNOON,  "Mid-afternoon"),
+    (WINDOW_DUSK,           "Dusk"),
+]
+
+
+def candidate_windows(date_obj: datetime, lat: float, lon: float) -> list[tuple[str, datetime]]:
     """
-    Return the time windows to evaluate for a single date.
-    We test dawn, dusk, and a mid-morning + mid-afternoon (in case overcast
-    extends the bite). The scorer will heavily penalize mid-day if conditions
-    don't justify it.
+    Return labeled time windows to evaluate for a single date.
+
+    Each entry is (window_label, datetime). Scoring happens within each
+    window independently; the display groups results by window so every
+    part of the day surfaces its best pick instead of dawn/dusk crowding
+    out the unified ranking.
     """
     sr, ss = sun.sunrise_sunset(date_obj, lat, lon)
     return [
-        sr + timedelta(minutes=15),       # dawn
-        sr + timedelta(hours=2, minutes=30),   # mid-morning
-        ss - timedelta(hours=2, minutes=30),   # mid-afternoon
-        ss - timedelta(minutes=15),       # dusk
+        (WINDOW_DAWN,           sr + timedelta(minutes=15)),
+        (WINDOW_MID_MORNING,    sr + timedelta(hours=2, minutes=30)),
+        (WINDOW_MID_AFTERNOON,  ss - timedelta(hours=2, minutes=30)),
+        (WINDOW_DUSK,           ss - timedelta(minutes=15)),
     ]

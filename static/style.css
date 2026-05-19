@@ -68,6 +68,27 @@ body {
 .day-meta { margin: .15rem 0 .75rem; color: var(--muted); font-size: .85rem; }
 .spring { color: var(--warn); margin-left: .5rem; font-weight: 600; }
 
+.rain-banner {
+  background: #1b2a3a;
+  border-left: 4px solid #4a90e2;
+  border-radius: 4px;
+  padding: .7rem .9rem;
+  margin: .35rem 0 .85rem;
+  color: var(--text);
+  font-size: .92rem;
+}
+
+.window-section { margin: .25rem 0 1.25rem; }
+.window-header {
+  margin: .85rem 0 .5rem;
+  font-size: .92rem;
+  color: var(--accent);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  border-bottom: 1px solid #234;
+  padding-bottom: .25rem;
+}
+
 .cards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
@@ -96,7 +117,7 @@ body {
   font-weight: 700;
   font-size: .85rem;
 }
-.card h3 { margin: 0 0 .15rem; font-size: 1.05rem; }
+.card h3, .card h4 { margin: 0 0 .15rem; font-size: 1.05rem; }
 .region { margin: 0 0 .5rem; color: var(--muted); font-size: .82rem; }
 .time-big { font-size: 1.15rem; margin: .25rem 0 .65rem; }
 .score-pill {

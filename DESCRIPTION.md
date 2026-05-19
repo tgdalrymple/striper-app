@@ -35,7 +35,9 @@ drop-off, bridge piling, etc.), and the relevant NOAA chart (12266 Choptank,
 ## Scoring criteria and weights
 
 Each spot is scored at four candidate windows per day (dawn, mid-morning,
-mid-afternoon, dusk). Each criterion produces a 0–100 sub-score, then the
+mid-afternoon, dusk). **Each window is ranked independently** so every part
+of the day surfaces its top picks instead of dawn/dusk crowding out a
+unified ranking. Each criterion produces a 0–100 sub-score, then the
 sub-scores are combined as a weighted average:
 
 | Weight | Criterion | What earns a high score |
@@ -52,6 +54,8 @@ sub-scores are combined as a weighted average:
 **Note on tide vs current.** *Tide phase* rewards the right TIMING — being 1–2 hours from a high or low. *Current strength* rewards the right MAGNITUDE — a spring tide pushes more water through the same cycle than a neap tide. Both contribute to "moving water = feeding fish."
 
 **Note on water temp and pressure.** Both come from the same CBIBS buoy (Gooses Reef, in the middle of our operating area) and are applied uniformly to every spot and every window in the 7-day forecast. Spatial variation across the area is small (~1–2 °F for water temp, essentially zero for pressure). Updated each time the page is loaded (subject to the 30-minute cache).
+
+**Rainy-day flag.** If more than half of a day's daylight hours are forecast rainy (probability of precipitation ≥ 50% or short-forecast says rain/shower/thunder without the "slight chance" qualifier), the day's header shows a 🌧️ banner noting it's likely a poor fishing day. The picks are still shown so you can decide for yourself.
 
 Weights are tunable in `services/scorer.py` (the `WEIGHTS` dictionary) to reflect
 what you observe on the water.

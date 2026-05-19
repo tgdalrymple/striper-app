@@ -32,7 +32,7 @@ app = Flask(__name__)
 
 SPOTS_PATH = Path(__file__).parent / "data" / "spots.json"
 FORECAST_DAYS = 7
-TOP_PER_DAY = 6
+TOP_PER_WINDOW = 2   # top picks per (day × window) bucket
 
 # Server-side cache so that 10 visitors in 10 minutes only trigger ONE round of
 # NOAA fetches. The data only meaningfully changes hourly, so a 30-minute TTL
@@ -81,47 +81,53 @@ def build_forecast() -> dict:
                     return other
         return weather_cache[key]
 
-    # --- Score every spot × day × window ---
+    # --- Score every spot × day × window, grouped by window ---
     today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-    results_by_day: dict[str, list] = {}
+    results_by_day_window: dict[str, dict[str, list]] = {}
 
     for day_offset in range(FORECAST_DAYS):
         date = today + timedelta(days=day_offset)
         day_key = date.strftime("%Y-%m-%d")
-        results_by_day[day_key] = []
+        results_by_day_window[day_key] = {label: [] for label, _ in scorer.WINDOWS_ORDERED}
 
         for spot in spots:
             tide_events = get_tides(spot["tide_station"])
             hourly = get_weather(spot["lat"], spot["lon"])
             if not tide_events:
-                continue   # skip if tide fetch failed
+                continue
 
             sr, ss = sun.sunrise_sunset(date, spot["lat"], spot["lon"])
             windows = scorer.candidate_windows(date, spot["lat"], spot["lon"])
 
-            for w in windows:
-                # Skip windows that have already passed — no point recommending
-                # them, and NOAA hourly forecast only covers future hours.
+            for label, w in windows:
+                # Skip windows that have already passed
                 if w <= datetime.now():
                     continue
                 scored = scorer.score_window(
                     spot, w, tide_events, hourly, sr, ss,
                     water_temp=water_temp, pressure=pressure,
                 )
-                results_by_day[day_key].append(scored)
+                scored["window"] = label
+                results_by_day_window[day_key][label].append(scored)
 
-    # --- Keep top N per day, sorted by score ---
-    for day_key in results_by_day:
-        results_by_day[day_key].sort(key=lambda x: x["score"], reverse=True)
-        results_by_day[day_key] = results_by_day[day_key][:TOP_PER_DAY]
+    # Keep top N per (day, window)
+    for day_key in results_by_day_window:
+        for label in results_by_day_window[day_key]:
+            results_by_day_window[day_key][label].sort(key=lambda x: x["score"], reverse=True)
+            results_by_day_window[day_key][label] = results_by_day_window[day_key][label][:TOP_PER_WINDOW]
 
-    # --- Day-level summary info (moon, etc.) ---
+    # --- Day-level summary info (moon, sunrise/sunset, rain forecast) ---
+    # Pick any successful weather grid as "representative" for the area —
+    # rain is a regional event, so one grid's forecast applies to all spots.
+    central_hourly = next((h for h in weather_cache.values() if h), [])
+
     day_summaries = []
     for day_offset in range(FORECAST_DAYS):
         date = today + timedelta(days=day_offset)
-        # use Cambridge for a representative sunrise/sunset
+        # Cambridge lat/lon for representative sunrise/sunset
         sr, ss = sun.sunrise_sunset(date, 38.57, -76.07)
         mp = moon.phase_for(date)
+        rainy, rain_pct = weather.is_rainy_day(central_hourly, sr, ss)
         day_summaries.append({
             "date": date,
             "date_key": date.strftime("%Y-%m-%d"),
@@ -130,12 +136,15 @@ def build_forecast() -> dict:
             "sunrise": sr.strftime("%-I:%M %p"),
             "sunset": ss.strftime("%-I:%M %p"),
             "moon": mp,
+            "rainy": rainy,
+            "rain_hours_pct": rain_pct,
         })
 
     return {
         "generated_at": datetime.now(),
         "days": day_summaries,
-        "results_by_day": results_by_day,
+        "results_by_day_window": results_by_day_window,
+        "windows_ordered": scorer.WINDOWS_ORDERED,
         "dnr": dnr_report.fetch_latest_report(),
         "water_temp": water_temp,
         "pressure": pressure,
