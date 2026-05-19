@@ -4,12 +4,14 @@ Scoring engine — turns raw conditions into a 0-100 score for each
 
 Weights are tunable. The defaults reflect the user's tuned preferences:
 
-  Tide phase (28%)  — TIMING: near but not at a high/low change.
-  Cloud cover (20%) — extends bite window, especially mid-day.
-  Moon (20%)        — spring tides (new/full ±3d) intensify current.
-  Structure (15%)   — drop-offs and points get a small bonus.
-  Current (12%)     — MAGNITUDE: how much water is actually moving (range × cycle position).
-  Wind / chop (5%)  — peak at 0-8 mph (≤7 knots); calm is good for this user.
+  Tide phase (25%)   — TIMING: near but not at a high/low change.
+  Cloud cover (15%)  — extends bite window, especially mid-day.
+  Moon (15%)         — spring tides (new/full ±3d) intensify current.
+  Structure (13%)    — drop-offs and points get a small bonus.
+  Current (10%)      — MAGNITUDE: how much water is actually moving (range × cycle position).
+  Water temp (10%)   — striper comfort band 60-72°F (from CBIBS Gooses Reef).
+  Pressure trend (7%) — falling pressure ahead of a front triggers bite (CBIBS).
+  Wind / chop (5%)   — peak at 0-8 mph (≤7 knots); calm is good for this user.
 
 You can adjust these in `WEIGHTS` to match what you observe on the water.
 """
@@ -18,19 +20,46 @@ from datetime import datetime, timedelta
 from . import tides, weather, moon, sun, lure
 
 WEIGHTS = {
-    "tide": 0.28,
-    "current": 0.12,
+    "tide": 0.25,
+    "current": 0.10,
     "wind": 0.05,
-    "cloud": 0.20,
-    "moon": 0.20,
-    "structure": 0.15,
+    "cloud": 0.15,
+    "moon": 0.15,
+    "structure": 0.13,
+    "water_temp": 0.10,
+    "pressure": 0.07,
 }
+
+# Pressure-trend label → score. Falling = front coming = good bite.
+_PRESSURE_SCORE = {
+    "falling fast": 100,
+    "falling": 85,
+    "steady": 50,
+    "rising": 30,
+    "rising fast": 15,
+    "unknown": 50,
+}
+
+
+def score_water_temp(temp_f: float) -> int:
+    """Striper comfort curve. Prime 60-72°F, fades outside that band."""
+    if 60 <= temp_f <= 72:                       return 100
+    if 55 <= temp_f < 60 or 72 < temp_f <= 78:   return 75
+    if 50 <= temp_f < 55 or 78 < temp_f <= 82:   return 45
+    if 45 <= temp_f < 50 or 82 < temp_f <= 86:   return 25
+    return 10
 
 
 def score_window(spot: dict, window_center: datetime,
                  tide_events: list, hourly: list,
-                 sunrise: datetime, sunset: datetime) -> dict:
-    """Score a single (spot, time window) combination. Returns full breakdown."""
+                 sunrise: datetime, sunset: datetime,
+                 water_temp: dict | None = None,
+                 pressure: dict | None = None) -> dict:
+    """Score a single (spot, time window) combination. Returns full breakdown.
+
+    `water_temp` and `pressure` are buoy snapshots applied to every window
+    (they don't vary by spot at the resolution we care about). See cbibs.py.
+    """
 
     # `closest` (minutes from nearest sunrise/sunset) is no longer a scored
     # criterion, but the cloud-scoring branch and rationale text still use it.
@@ -82,6 +111,18 @@ def score_window(spot: dict, window_center: datetime,
     # --- Structure ---
     structure_score = 80 if spot.get("drop_off") else 60
 
+    # --- Water temperature (CBIBS Gooses Reef, applied to all windows) ---
+    if water_temp and water_temp.get("temp_f") is not None:
+        water_temp_score = score_water_temp(water_temp["temp_f"])
+    else:
+        water_temp_score = 50  # neutral if we can't read CBIBS
+
+    # --- Barometric pressure trend (CBIBS, applied to all windows) ---
+    if pressure and pressure.get("trend_label"):
+        pressure_score = _PRESSURE_SCORE.get(pressure["trend_label"], 50)
+    else:
+        pressure_score = 50
+
     # --- Weighted sum ---
     total = (
         tide_score * WEIGHTS["tide"] +
@@ -89,7 +130,9 @@ def score_window(spot: dict, window_center: datetime,
         wind_score * WEIGHTS["wind"] +
         cloud_score * WEIGHTS["cloud"] +
         moon_score * WEIGHTS["moon"] +
-        structure_score * WEIGHTS["structure"]
+        structure_score * WEIGHTS["structure"] +
+        water_temp_score * WEIGHTS["water_temp"] +
+        pressure_score * WEIGHTS["pressure"]
     )
 
     # --- Lure recommendation tied to this window ---
@@ -109,7 +152,8 @@ def score_window(spot: dict, window_center: datetime,
 
     # --- Rationale text ---
     rationale = _rationale(
-        spot, window_center, tide_state, current, mp, wind_mph, sky, temp_f, closest
+        spot, window_center, tide_state, current, mp, wind_mph, sky, temp_f, closest,
+        water_temp, pressure,
     )
 
     return {
@@ -120,6 +164,7 @@ def score_window(spot: dict, window_center: datetime,
             "tide": tide_score, "current": current_score,
             "wind": wind_score, "cloud": round(cloud_score, 0),
             "moon": moon_score, "structure": structure_score,
+            "water_temp": water_temp_score, "pressure": pressure_score,
         },
         "conditions": {
             "wind_mph": wind_mph, "sky_cover_pct": sky, "temp_f": temp_f,
@@ -131,13 +176,18 @@ def score_window(spot: dict, window_center: datetime,
             "moon_phase": mp["phase_name"],
             "moon_illum_pct": mp["illumination_pct"],
             "is_spring_tide": mp["is_spring_tide"],
+            "water_temp_f": water_temp.get("temp_f") if water_temp else None,
+            "water_temp_trend": water_temp.get("trend_label") if water_temp else None,
+            "pressure_mb": pressure.get("pressure_mb") if pressure else None,
+            "pressure_trend": pressure.get("trend_label") if pressure else None,
         },
         "lure": pick,
         "rationale": rationale,
     }
 
 
-def _rationale(spot, when, tide_state, current, mp, wind, sky, temp, mins_from_light):
+def _rationale(spot, when, tide_state, current, mp, wind, sky, temp,
+               mins_from_light, water_temp=None, pressure=None):
     """Build a plain-English explanation of why this window scored as it did."""
     parts = []
 
@@ -182,6 +232,29 @@ def _rationale(spot, when, tide_state, current, mp, wind, sky, temp, mins_from_l
 
     if spot.get("drop_off"):
         parts.append("Structure: drop-off — stripers ambush from deep water into the shallows.")
+
+    if water_temp:
+        wt = water_temp.get("temp_f")
+        tt = water_temp.get("trend_label", "")
+        if wt is not None:
+            if 60 <= wt <= 72:
+                parts.append(f"Water {wt}°F ({tt}) — squarely in striper comfort band.")
+            elif wt < 55:
+                parts.append(f"Water {wt}°F ({tt}) — cold; stripers sluggish, focus on slower presentations.")
+            elif wt > 78:
+                parts.append(f"Water {wt}°F ({tt}) — warm; bite shifts to dawn/dusk and deeper water.")
+            else:
+                parts.append(f"Water {wt}°F ({tt}) — workable but not prime.")
+
+    if pressure:
+        pt = pressure.get("trend_label", "")
+        pm = pressure.get("pressure_mb")
+        if pt in ("falling fast", "falling"):
+            parts.append(f"Barometer {pm} mb and {pt} — front approaching; classic feeding trigger.")
+        elif pt in ("rising fast", "rising"):
+            parts.append(f"Barometer {pm} mb and {pt} — post-frontal; bite usually slower.")
+        elif pt == "steady":
+            parts.append(f"Barometer {pm} mb and steady — neutral weather, no trigger or shutdown.")
 
     parts.append(f"Spot notes: {spot.get('rationale','')}")
 

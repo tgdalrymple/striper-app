@@ -16,6 +16,28 @@
     </p>
   </header>
 
+  {% if f.water_temp or f.pressure %}
+  <section class="snapshot">
+    <h2>Current bay conditions <span class="snap-src">(CBIBS Gooses Reef buoy)</span></h2>
+    <div class="snap-row">
+      {% if f.water_temp %}
+      <div class="snap-cell">
+        <span class="snap-label">Water temp</span>
+        <span class="snap-value">{{ f.water_temp.temp_f }}°F</span>
+        <span class="snap-trend">{{ f.water_temp.trend_label }} ({{ f.water_temp.change_per_day_f }}°/day)</span>
+      </div>
+      {% endif %}
+      {% if f.pressure %}
+      <div class="snap-cell">
+        <span class="snap-label">Barometer</span>
+        <span class="snap-value">{{ f.pressure.pressure_mb }} mb</span>
+        <span class="snap-trend">{{ f.pressure.trend_label }} ({{ f.pressure.change_12hr_mb }} mb/12hr)</span>
+      </div>
+      {% endif %}
+    </div>
+  </section>
+  {% endif %}
+
   {% if f.dnr %}
   <section class="dnr">
     <h2>Latest MD DNR Fishing Report</h2>
@@ -75,6 +97,8 @@
                   <ul class="conditions">
                     <li>Tide: {{ r.conditions.tide_phase }} — {{ r.conditions.minutes_from_tide_change }} min from change</li>
                     <li>Current: {{ r.conditions.current_label }} ({{ r.conditions.current_score }}/100) — {{ r.conditions.tidal_range_ft }} ft cycle range</li>
+                    {% if r.conditions.water_temp_f %}<li>Water temp: {{ r.conditions.water_temp_f }}°F ({{ r.conditions.water_temp_trend }})</li>{% endif %}
+                    {% if r.conditions.pressure_mb %}<li>Barometer: {{ r.conditions.pressure_mb }} mb ({{ r.conditions.pressure_trend }})</li>{% endif %}
                     <li>Wind: {{ r.conditions.wind_mph }} mph</li>
                     <li>Sky: {{ r.conditions.sky_cover_pct }}% covered</li>
                     <li>Air temp: {{ r.conditions.temp_f }}°F</li>
@@ -82,7 +106,7 @@
                     <li>Structure: {{ r.spot.structure }}</li>
                   </ul>
                   <p class="rationale">{{ r.rationale }}</p>
-                  <p class="components">Score breakdown — tide {{ r.components.tide }}, current {{ r.components.current }}, wind {{ r.components.wind }}, cloud {{ r.components.cloud }}, moon {{ r.components.moon }}, structure {{ r.components.structure }}</p>
+                  <p class="components">Score breakdown — tide {{ r.components.tide }}, current {{ r.components.current }}, water_temp {{ r.components.water_temp }}, pressure {{ r.components.pressure }}, cloud {{ r.components.cloud }}, moon {{ r.components.moon }}, structure {{ r.components.structure }}, wind {{ r.components.wind }}</p>
                 </details>
 
                 {% if r.spot.obstructions %}

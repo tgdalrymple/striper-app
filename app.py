@@ -26,7 +26,7 @@ from pathlib import Path
 
 from flask import Flask, render_template
 
-from services import tides, weather, moon, sun, scorer, dnr_report, obstructions
+from services import tides, weather, moon, sun, scorer, dnr_report, obstructions, cbibs
 
 app = Flask(__name__)
 
@@ -59,6 +59,10 @@ def build_forecast() -> dict:
     # --- Cache fetches so we don't repeat API calls ---
     tide_cache: dict[str, list] = {}
     weather_cache: dict[str, list] = {}
+
+    # CBIBS snapshots — fetched once and reused for every spot×window
+    water_temp = cbibs.water_temp_snapshot()
+    pressure = cbibs.pressure_trend_snapshot()
 
     def get_tides(station_id):
         if station_id not in tide_cache:
@@ -101,7 +105,8 @@ def build_forecast() -> dict:
                 if w <= datetime.now():
                     continue
                 scored = scorer.score_window(
-                    spot, w, tide_events, hourly, sr, ss
+                    spot, w, tide_events, hourly, sr, ss,
+                    water_temp=water_temp, pressure=pressure,
                 )
                 results_by_day[day_key].append(scored)
 
@@ -132,6 +137,8 @@ def build_forecast() -> dict:
         "days": day_summaries,
         "results_by_day": results_by_day,
         "dnr": dnr_report.fetch_latest_report(),
+        "water_temp": water_temp,
+        "pressure": pressure,
     }
 
 

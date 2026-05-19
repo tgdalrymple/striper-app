@@ -26,6 +26,8 @@ drop-off, bridge piling, etc.), and the relevant NOAA chart (12266 Choptank,
 |---|---|
 | **NOAA Tides & Currents API** | High/low tide predictions for each spot's nearest station (Cambridge, Oxford, Knapps Narrows, Cook Point) |
 | **NOAA National Weather Service API** | Hourly forecast — wind speed, sky cover, air temperature |
+| **CBIBS Gooses Reef buoy** | Live water temperature and barometric pressure trend (one buoy serves the whole area) |
+| **NOAA Electronic Navigational Charts** | Shallow-water obstructions, wrecks, rocks, daymarks within 1 nm of each spot |
 | **Astronomical calculation** | Sunrise/sunset (NOAA solar position formula), moon phase (synodic-month math) |
 | **MD DNR weekly fishing report** | Most recent report scraped from news.maryland.gov and displayed for ground-truth context |
 | **NOAA Charts 12266 & 12270** | Referenced when curating spot bathymetry and structure notes |
@@ -38,14 +40,18 @@ sub-scores are combined as a weighted average:
 
 | Weight | Criterion | What earns a high score |
 |---|---|---|
-| **28%** | **Tide phase (timing)** | 1–2 hours from a tide change (moving water) = 100. Slack tide (±30 min of high/low) = 15. |
-| **20%** | **Cloud cover** | Especially valuable mid-day — overcast extends the low-light bite window. |
-| **20%** | **Moon phase** | Spring tides (within 3 days of new or full moon) = 90. Otherwise 60. |
-| **15%** | **Structure** | Spots with a defined drop-off = 80. Open-water spots = 60. |
-| **12%** | **Current strength (magnitude)** | Sinusoidal model from tide cycle position × tidal range. Slack = 0. Mid-cycle on a 3 ft+ tidal swing = 100. Higher current is better. |
+| **25%** | **Tide phase (timing)** | 1–2 hours from a tide change (moving water) = 100. Slack tide (±30 min of high/low) = 15. |
+| **15%** | **Cloud cover** | Especially valuable mid-day — overcast extends the low-light bite window. |
+| **15%** | **Moon phase** | Spring tides (within 3 days of new or full moon) = 90. Otherwise 60. |
+| **13%** | **Structure** | Spots with a defined drop-off = 80. Open-water spots = 60. |
+| **10%** | **Current strength (magnitude)** | Sinusoidal model from tide cycle position × tidal range. Slack = 0. Mid-cycle on a 3 ft+ tidal swing = 100. |
+| **10%** | **Water temperature** | Live reading from CBIBS Gooses Reef buoy. Prime 60–72 °F = 100, then 55–60 / 72–78 = 75, 50–55 / 78–82 = 45, beyond that lower. |
+| **7%** | **Barometric pressure trend** | Live reading from CBIBS. 12-hour change: falling fast = 100, falling = 85, steady = 50, rising = 30, rising fast = 15. Falling pressure (approaching front) is a classic feeding trigger. |
 | **5%** | **Wind / surface chop** | Calm to light breeze (≤8 mph / ~7 knots) = 100. 9–12 mph = 70. 13–15 = 50. 16–20 = 30. 21–25 = 15. >25 mph = 5. |
 
-**Note on tide vs current.** These are two complementary criteria. *Tide phase* rewards the right TIMING — being 1–2 hours from a high or low (the rule-of-thumb "moving water" window). *Current strength* rewards the right MAGNITUDE — a spring tide pushes more water through the same cycle than a neap tide, even at the same number of minutes from slack. Both contribute to "moving water = feeding fish."
+**Note on tide vs current.** *Tide phase* rewards the right TIMING — being 1–2 hours from a high or low. *Current strength* rewards the right MAGNITUDE — a spring tide pushes more water through the same cycle than a neap tide. Both contribute to "moving water = feeding fish."
+
+**Note on water temp and pressure.** Both come from the same CBIBS buoy (Gooses Reef, in the middle of our operating area) and are applied uniformly to every spot and every window in the 7-day forecast. Spatial variation across the area is small (~1–2 °F for water temp, essentially zero for pressure). Updated each time the page is loaded (subject to the 30-minute cache).
 
 Weights are tunable in `services/scorer.py` (the `WEIGHTS` dictionary) to reflect
 what you observe on the water.
