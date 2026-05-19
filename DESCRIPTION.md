@@ -38,18 +38,19 @@ sub-scores are combined as a weighted average:
 
 | Weight | Criterion | What earns a high score |
 |---|---|---|
-| **25%** | **Tide phase (timing)** | 1–2 hours from a tide change (moving water) = 100. Slack tide (±30 min of high/low) = 15. |
+| **28%** | **Tide phase (timing)** | 1–2 hours from a tide change (moving water) = 100. Slack tide (±30 min of high/low) = 15. |
 | **20%** | **Cloud cover** | Especially valuable mid-day — overcast extends the low-light bite window. |
 | **20%** | **Moon phase** | Spring tides (within 3 days of new or full moon) = 90. Otherwise 60. |
 | **15%** | **Structure** | Spots with a defined drop-off = 80. Open-water spots = 60. |
-| **10%** | **Current strength (magnitude)** | Sinusoidal model from tide cycle position × tidal range. Slack = 0. Mid-cycle on a 3 ft+ tidal swing = 100. Higher current is better. |
-| **5%** | **Light level** | Within 30 min of sunrise/sunset = 100. Drops sharply with distance from dawn/dusk windows. |
-| **5%** | **Wind / surface chop** | 5–15 mph = 100 (ideal ripple). Slick calm <3 mph = 50. 21–25 mph = 30. >25 mph = 10. |
+| **12%** | **Current strength (magnitude)** | Sinusoidal model from tide cycle position × tidal range. Slack = 0. Mid-cycle on a 3 ft+ tidal swing = 100. Higher current is better. |
+| **5%** | **Wind / surface chop** | Calm to light breeze (≤8 mph / ~7 knots) = 100. 9–12 mph = 70. 13–15 = 50. 16–20 = 30. 21–25 = 15. >25 mph = 5. |
 
 **Note on tide vs current.** These are two complementary criteria. *Tide phase* rewards the right TIMING — being 1–2 hours from a high or low (the rule-of-thumb "moving water" window). *Current strength* rewards the right MAGNITUDE — a spring tide pushes more water through the same cycle than a neap tide, even at the same number of minutes from slack. Both contribute to "moving water = feeding fish."
 
 Weights are tunable in `services/scorer.py` (the `WEIGHTS` dictionary) to reflect
 what you observe on the water.
+
+**Note on light.** Sunrise / sunset timing is still computed (it drives the cloud-cover sub-score and the rationale text), but it is no longer a scored criterion on its own. The user fishes outside the dawn/dusk window and weights the other factors more heavily.
 
 ## Lure-selection logic
 

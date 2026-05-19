@@ -2,15 +2,14 @@
 Scoring engine — turns raw conditions into a 0-100 score for each
 (spot × time window) and produces human-readable rationale.
 
-Weights are tunable. The defaults reflect topwater-striper conventional wisdom:
+Weights are tunable. The defaults reflect the user's tuned preferences:
 
-  Tide phase (25%)  — TIMING: near but not at a high/low change.
+  Tide phase (28%)  — TIMING: near but not at a high/low change.
   Cloud cover (20%) — extends bite window, especially mid-day.
   Moon (20%)        — spring tides (new/full ±3d) intensify current.
   Structure (15%)   — drop-offs and points get a small bonus.
-  Current (10%)     — MAGNITUDE: how much water is actually moving (range × cycle position).
-  Light (5%)        — dawn/dusk dominate; mid-day only with heavy clouds.
-  Wind / chop (5%)  — 5-15 mph ideal; calm hurts, 20+ kills topwater.
+  Current (12%)     — MAGNITUDE: how much water is actually moving (range × cycle position).
+  Wind / chop (5%)  — peak at 0-8 mph (≤7 knots); calm is good for this user.
 
 You can adjust these in `WEIGHTS` to match what you observe on the water.
 """
@@ -19,9 +18,8 @@ from datetime import datetime, timedelta
 from . import tides, weather, moon, sun, lure
 
 WEIGHTS = {
-    "light": 0.05,
-    "tide": 0.25,
-    "current": 0.10,
+    "tide": 0.28,
+    "current": 0.12,
     "wind": 0.05,
     "cloud": 0.20,
     "moon": 0.20,
@@ -34,15 +32,11 @@ def score_window(spot: dict, window_center: datetime,
                  sunrise: datetime, sunset: datetime) -> dict:
     """Score a single (spot, time window) combination. Returns full breakdown."""
 
-    # --- Light score ---
+    # `closest` (minutes from nearest sunrise/sunset) is no longer a scored
+    # criterion, but the cloud-scoring branch and rationale text still use it.
     minutes_from_dawn = abs((window_center - sunrise).total_seconds() / 60)
     minutes_from_dusk = abs((window_center - sunset).total_seconds() / 60)
     closest = min(minutes_from_dawn, minutes_from_dusk)
-    if closest <= 30:        light = 100
-    elif closest <= 60:      light = 85
-    elif closest <= 90:      light = 65
-    elif closest <= 150:     light = 40
-    else:                    light = 15
 
     # --- Tide phase score (TIMING — near but not at a change) ---
     tide_state = tides.tide_state_at(tide_events, window_center)
@@ -65,13 +59,13 @@ def score_window(spot: dict, window_center: datetime,
     sky = fc["sky_cover_pct"] if fc else 50
     temp_f = fc["temp_f"] if fc else 65
 
-    # Wind ideal band 5-15
-    if 5 <= wind_mph <= 15:     wind_score = 100
-    elif wind_mph <= 3:         wind_score = 50  # slick calm
-    elif wind_mph <= 4:         wind_score = 65
-    elif 16 <= wind_mph <= 20:  wind_score = 60
-    elif 21 <= wind_mph <= 25:  wind_score = 30
-    else:                       wind_score = 10  # blown out
+    # Wind — user prefers calm. Peak at 0-8 mph (≤7 knots), falls off above.
+    if wind_mph <= 8:           wind_score = 100  # calm to light breeze
+    elif wind_mph <= 12:        wind_score = 70
+    elif wind_mph <= 15:        wind_score = 50
+    elif wind_mph <= 20:        wind_score = 30
+    elif wind_mph <= 25:        wind_score = 15
+    else:                       wind_score = 5    # blown out
 
     # Clouds: clearer doesn't help mid-day; overcast bonus
     if closest > 120:
@@ -90,7 +84,6 @@ def score_window(spot: dict, window_center: datetime,
 
     # --- Weighted sum ---
     total = (
-        light * WEIGHTS["light"] +
         tide_score * WEIGHTS["tide"] +
         current_score * WEIGHTS["current"] +
         wind_score * WEIGHTS["wind"] +
@@ -124,7 +117,7 @@ def score_window(spot: dict, window_center: datetime,
         "time": window_center,
         "score": round(total, 1),
         "components": {
-            "light": light, "tide": tide_score, "current": current_score,
+            "tide": tide_score, "current": current_score,
             "wind": wind_score, "cloud": round(cloud_score, 0),
             "moon": moon_score, "structure": structure_score,
         },
@@ -174,12 +167,12 @@ def _rationale(spot, when, tide_state, current, mp, wind, sky, temp, mins_from_l
     elif label in ("weak", "slack"):
         parts.append(f"Current is {label} ({current['score_0_100']}/100) — bait isn't being pushed; bite typically slower.")
 
-    if 5 <= wind <= 15:
-        parts.append(f"Wind {wind} mph puts a ripple on the surface that hides your boat and the lure's seams.")
-    elif wind <= 3:
-        parts.append(f"Wind {wind} mph — slick calm; fish can scrutinize the lure, expect short strikes.")
+    if wind <= 8:
+        parts.append(f"Wind {wind} mph — calm to light breeze; quiet presentation, fish less spooky.")
+    elif wind <= 15:
+        parts.append(f"Wind {wind} mph — workable but breezier than ideal.")
     else:
-        parts.append(f"Wind {wind} mph — challenging conditions for accurate topwater casting.")
+        parts.append(f"Wind {wind} mph — challenging conditions for accurate casting and boat handling.")
 
     if sky >= 70:
         parts.append(f"Sky {sky}% covered — fish feel safer in low light and roam shallower.")
