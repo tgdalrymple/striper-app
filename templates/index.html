@@ -74,6 +74,7 @@
                   <summary>Conditions &amp; rationale</summary>
                   <ul class="conditions">
                     <li>Tide: {{ r.conditions.tide_phase }} — {{ r.conditions.minutes_from_tide_change }} min from change</li>
+                    <li>Current: {{ r.conditions.current_label }} ({{ r.conditions.current_score }}/100) — {{ r.conditions.tidal_range_ft }} ft cycle range</li>
                     <li>Wind: {{ r.conditions.wind_mph }} mph</li>
                     <li>Sky: {{ r.conditions.sky_cover_pct }}% covered</li>
                     <li>Air temp: {{ r.conditions.temp_f }}°F</li>
@@ -81,7 +82,7 @@
                     <li>Structure: {{ r.spot.structure }}</li>
                   </ul>
                   <p class="rationale">{{ r.rationale }}</p>
-                  <p class="components">Score breakdown — light {{ r.components.light }}, tide {{ r.components.tide }}, wind {{ r.components.wind }}, cloud {{ r.components.cloud }}, moon {{ r.components.moon }}, structure {{ r.components.structure }}</p>
+                  <p class="components">Score breakdown — light {{ r.components.light }}, tide {{ r.components.tide }}, current {{ r.components.current }}, wind {{ r.components.wind }}, cloud {{ r.components.cloud }}, moon {{ r.components.moon }}, structure {{ r.components.structure }}</p>
                 </details>
 
                 {% if r.spot.obstructions %}

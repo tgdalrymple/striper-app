@@ -4,12 +4,13 @@ Scoring engine — turns raw conditions into a 0-100 score for each
 
 Weights are tunable. The defaults reflect topwater-striper conventional wisdom:
 
-  Light (20%)      — dawn/dusk dominate; mid-day only with heavy clouds.
-  Tide (35%)       — moving water 1-2 hrs from a change; slack tide is dead.
-  Wind / chop (5%) — 5-15 mph ideal; calm hurts, 20+ kills topwater.
-  Cloud cover (10%) — extends bite window, especially mid-day.
-  Moon (15%)        — spring tides (new/full ±3d) intensify current.
+  Tide phase (25%)  — TIMING: near but not at a high/low change.
+  Cloud cover (20%) — extends bite window, especially mid-day.
+  Moon (20%)        — spring tides (new/full ±3d) intensify current.
   Structure (15%)   — drop-offs and points get a small bonus.
+  Current (10%)     — MAGNITUDE: how much water is actually moving (range × cycle position).
+  Light (5%)        — dawn/dusk dominate; mid-day only with heavy clouds.
+  Wind / chop (5%)  — 5-15 mph ideal; calm hurts, 20+ kills topwater.
 
 You can adjust these in `WEIGHTS` to match what you observe on the water.
 """
@@ -18,11 +19,12 @@ from datetime import datetime, timedelta
 from . import tides, weather, moon, sun, lure
 
 WEIGHTS = {
-    "light": 0.20,
-    "tide": 0.35,
+    "light": 0.05,
+    "tide": 0.25,
+    "current": 0.10,
     "wind": 0.05,
-    "cloud": 0.10,
-    "moon": 0.15,
+    "cloud": 0.20,
+    "moon": 0.20,
     "structure": 0.15,
 }
 
@@ -42,7 +44,7 @@ def score_window(spot: dict, window_center: datetime,
     elif closest <= 150:     light = 40
     else:                    light = 15
 
-    # --- Tide score ---
+    # --- Tide phase score (TIMING — near but not at a change) ---
     tide_state = tides.tide_state_at(tide_events, window_center)
     mins_from = tide_state["minutes_from_change"]
     if tide_state["phase"] == "slack":
@@ -52,6 +54,10 @@ def score_window(spot: dict, window_center: datetime,
     elif mins_from < 120:       tide_score = 100   # the sweet spot
     elif mins_from < 180:       tide_score = 80
     else:                       tide_score = 45
+
+    # --- Current strength score (MAGNITUDE — how much water is moving) ---
+    current = tides.current_strength_at(tide_events, window_center)
+    current_score = current["score_0_100"]
 
     # --- Weather (wind + clouds + temp) ---
     fc = weather.find_forecast_for(hourly, window_center)
@@ -86,6 +92,7 @@ def score_window(spot: dict, window_center: datetime,
     total = (
         light * WEIGHTS["light"] +
         tide_score * WEIGHTS["tide"] +
+        current_score * WEIGHTS["current"] +
         wind_score * WEIGHTS["wind"] +
         cloud_score * WEIGHTS["cloud"] +
         moon_score * WEIGHTS["moon"] +
@@ -109,7 +116,7 @@ def score_window(spot: dict, window_center: datetime,
 
     # --- Rationale text ---
     rationale = _rationale(
-        spot, window_center, tide_state, mp, wind_mph, sky, temp_f, closest
+        spot, window_center, tide_state, current, mp, wind_mph, sky, temp_f, closest
     )
 
     return {
@@ -117,14 +124,17 @@ def score_window(spot: dict, window_center: datetime,
         "time": window_center,
         "score": round(total, 1),
         "components": {
-            "light": light, "tide": tide_score, "wind": wind_score,
-            "cloud": round(cloud_score, 0), "moon": moon_score,
-            "structure": structure_score,
+            "light": light, "tide": tide_score, "current": current_score,
+            "wind": wind_score, "cloud": round(cloud_score, 0),
+            "moon": moon_score, "structure": structure_score,
         },
         "conditions": {
             "wind_mph": wind_mph, "sky_cover_pct": sky, "temp_f": temp_f,
             "tide_phase": tide_state["phase"],
             "minutes_from_tide_change": mins_from,
+            "current_label": current["label"],
+            "current_score": current_score,
+            "tidal_range_ft": current.get("range_ft", 0),
             "moon_phase": mp["phase_name"],
             "moon_illum_pct": mp["illumination_pct"],
             "is_spring_tide": mp["is_spring_tide"],
@@ -134,7 +144,7 @@ def score_window(spot: dict, window_center: datetime,
     }
 
 
-def _rationale(spot, when, tide_state, mp, wind, sky, temp, mins_from_light):
+def _rationale(spot, when, tide_state, current, mp, wind, sky, temp, mins_from_light):
     """Build a plain-English explanation of why this window scored as it did."""
     parts = []
 
@@ -154,6 +164,15 @@ def _rationale(spot, when, tide_state, mp, wind, sky, temp, mins_from_light):
                      f"and bait is on the move with it.")
     else:
         parts.append(f"{phase.capitalize()} tide, {mins} min from change — still moving but past the strongest flow.")
+
+    # Current strength commentary — separate from tide phase
+    label = current.get("label", "")
+    if label in ("strong", "peak"):
+        parts.append(f"Current is {label} ({current['score_0_100']}/100, ~{current['range_ft']} ft cycle range) — moving water concentrates bait through pinch points.")
+    elif label == "moderate":
+        parts.append(f"Current is moderate ({current['score_0_100']}/100) — workable but not peak.")
+    elif label in ("weak", "slack"):
+        parts.append(f"Current is {label} ({current['score_0_100']}/100) — bait isn't being pushed; bite typically slower.")
 
     if 5 <= wind <= 15:
         parts.append(f"Wind {wind} mph puts a ripple on the surface that hides your boat and the lure's seams.")

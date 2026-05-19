@@ -57,6 +57,69 @@ def fetch_tide_predictions(station_id: str, days: int = 7) -> list[dict]:
     return events
 
 
+def current_strength_at(events: list[dict], when: datetime) -> dict:
+    """
+    Estimate the relative water current strength at `when`.
+
+    Why this matters: stripers feed in moving water. The tide-phase criterion
+    rewards good TIMING (near but not at a tide change). Current strength is
+    the complementary MAGNITUDE measure — how much water is actually being
+    pushed. A spring tide at mid-cycle moves a LOT more water than a neap
+    tide at the same moment relative to slack.
+
+    Model: combines two physical drivers
+      1. Position in the tide cycle — current is zero at high/low (slack) and
+         peaks at the midpoint. A sin(π·fraction) curve captures this.
+      2. Tidal range — bigger swing between high and low means more water has
+         to move in the same window, so peak current is higher. Normalized
+         against a typical Chesapeake range of ~3 ft.
+
+    Returns a dict with:
+        relative:    0.0 → 1.0+, peaks ~1.0 on average mid-tide
+        score_0_100: clipped to 100 for use in the weighted score
+        label:       "slack" / "weak" / "moderate" / "strong" / "peak"
+    """
+    import math
+
+    prev_event = None
+    next_event = None
+    for e in events:
+        if e["time"] <= when:
+            prev_event = e
+        elif next_event is None:
+            next_event = e
+            break
+
+    if prev_event is None or next_event is None:
+        return {"relative": 0.0, "score_0_100": 0, "label": "unknown"}
+
+    cycle_seconds = (next_event["time"] - prev_event["time"]).total_seconds()
+    if cycle_seconds <= 0:
+        return {"relative": 0.0, "score_0_100": 0, "label": "unknown"}
+
+    fraction = (when - prev_event["time"]).total_seconds() / cycle_seconds
+    sinusoid = math.sin(math.pi * fraction)   # 0 → 1 → 0 across the cycle
+
+    range_ft = abs(next_event["height_ft"] - prev_event["height_ft"])
+    range_factor = min(1.0, range_ft / 3.0)   # 3ft+ swing = full strength
+
+    relative = sinusoid * range_factor
+    score = int(round(min(100, relative * 100)))
+
+    if   score < 20:  label = "slack"
+    elif score < 40:  label = "weak"
+    elif score < 60:  label = "moderate"
+    elif score < 80:  label = "strong"
+    else:             label = "peak"
+
+    return {
+        "relative": round(relative, 2),
+        "score_0_100": score,
+        "label": label,
+        "range_ft": round(range_ft, 1),
+    }
+
+
 def tide_state_at(events: list[dict], when: datetime) -> dict:
     """
     Given the list of high/low events and a target time, describe the tide state.
